@@ -3,5 +3,5 @@ node_modules/
 companies.json
 sent.json
 subject.txt
-email.txt
+emails/
 *.pdf

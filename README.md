@@ -18,9 +18,9 @@ A terminal tool for sending personalized cold emails via Gmail. Tracks companies
 
 3. **Add your content files** (all gitignored)
 
-   | File | Purpose |
-   |------|---------|
-   | `email.txt` | Email body. Use `{name}` where the recipient's name should appear. |
+   | File / Folder | Purpose |
+   |---------------|---------|
+   | `emails/` | Folder of `.txt` body templates. Use `{name}` for the recipient's name. Add as many as you want — picked via arrow keys. |
    | `subject.txt` | One subject per line — shown as a selection list in the CLI. |
    | `YOUR_RESUME.pdf` | Attached automatically to every email. Update the filename in `userPrompt.js`. |
 
@@ -36,8 +36,9 @@ You will be prompted for:
 2. **Sender LinkedIn URL** — recipient's name is fetched automatically
 3. **Sender Email** — used as the `To` field
 4. **Subject** — pick from the list in `subject.txt` using arrow keys
+5. **Email template** — pick from files in the `emails/` folder using arrow keys
 
-Body and attachment are loaded automatically. No other input needed.
+A full preview of the composed email is shown before sending. Confirm with `y` to send or `n` to abort.
 
 ### Name resolution
 
@@ -92,7 +93,7 @@ Send again? (y/n):
 .env
 companies.json
 sent.json
-email.txt
+emails/
 subject.txt
 *.pdf
 ```

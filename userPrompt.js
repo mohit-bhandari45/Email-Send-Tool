@@ -1,13 +1,12 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import select from "@inquirer/select";
-import { ask, rl } from "./helper.js";
+import { select, input, confirm } from "@inquirer/prompts";
 import { check as checkSent } from "./sentLog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const EMAIL_BODY_FILE = path.join(__dirname, "email.txt");
+const EMAILS_DIR = path.join(__dirname, "emails");
 const SUBJECT_FILE = path.join(__dirname, "subject.txt");
 const RESUME_FILE = path.join(__dirname, "MOHIT_BHANDARI_RESUME.pdf");
 const COMPANIES_FILE = path.join(__dirname, "companies.json");
@@ -66,7 +65,7 @@ async function promptUser() {
     let companyLinkedin = "";
     let companyName = "";
     while (!companyName) {
-        companyLinkedin = await ask("Company LinkedIn URL: ");
+        companyLinkedin = await input({ message: "Company LinkedIn URL:" });
         companyName = extractCompanyName(companyLinkedin);
         if (!companyName) console.log("  ⚠️  Invalid LinkedIn company URL. Expected format: linkedin.com/company/<name>\n");
     }
@@ -76,7 +75,7 @@ async function promptUser() {
     let ownerLinkedin = "";
     let recipientName = "";
     while (!ownerLinkedin) {
-        ownerLinkedin = await ask("Sender LinkedIn URL: ");
+        ownerLinkedin = await input({ message: "Sender LinkedIn URL:" });
         if (!ownerLinkedin) { console.log("  ⚠️  Sender LinkedIn URL is required.\n"); continue; }
         process.stdout.write("  → Fetching name from LinkedIn...");
         recipientName = await fetchLinkedInName(ownerLinkedin) ?? slugToName(ownerLinkedin) ?? "there";
@@ -91,7 +90,7 @@ async function promptUser() {
     ]);
     let to = "";
     while (!to) {
-        to = await ask("Sender Email (To): ");
+        to = await input({ message: "Sender Email (To):" });
         if (!to) console.log("  ⚠️  Sender email is required.\n");
     }
     const localPart = to.split("@")[0].toLowerCase();
@@ -103,10 +102,9 @@ async function promptUser() {
     const previousSend = checkSent(to);
     if (previousSend) {
         console.log(`\n  ⚠️   Already sent to ${to} on ${new Date(previousSend.sentAt).toDateString()} — Subject: "${previousSend.subject}"`);
-        const again = await ask("  Send again? (y/n): ");
-        if (again.toLowerCase() !== "y") {
+        const again = await confirm({ message: "Send again?" });
+        if (!again) {
             console.log("  Aborted.");
-            rl.close();
             process.exit(0);
         }
     }
@@ -145,13 +143,21 @@ async function promptUser() {
     });
     console.log(`📌  Subject: ${subject}`);
 
-    // Body — read from email.txt
-    if (!fs.existsSync(EMAIL_BODY_FILE)) {
-        console.error("❌  email.txt not found in project directory.");
+    // Body — pick template from emails/
+    if (!fs.existsSync(EMAILS_DIR)) {
+        console.error("❌  emails/ folder not found in project directory.");
         process.exit(1);
     }
-    const body = fs.readFileSync(EMAIL_BODY_FILE, "utf-8").trim().replace("{name}", recipientName);
-    console.log(`\n📝  Body loaded from email.txt (${body.split("\n").length} lines)`);
+    const templates = fs.readdirSync(EMAILS_DIR).filter(f => f.endsWith(".txt"));
+    if (!templates.length) {
+        console.error("❌  No .txt templates found in emails/ folder.");
+        process.exit(1);
+    }
+    const chosenTemplate = await select({
+        message: "Email template:",
+        choices: templates.map(f => ({ name: path.basename(f, ".txt"), value: f })),
+    });
+    const body = fs.readFileSync(path.join(EMAILS_DIR, chosenTemplate), "utf-8").trim().replace("{name}", recipientName);
 
     // Attachments — always attach resume
     if (!fs.existsSync(RESUME_FILE)) {
@@ -159,18 +165,22 @@ async function promptUser() {
         process.exit(1);
     }
     const attachments = [{ path: RESUME_FILE }];
-    console.log(`📎  Attaching: MOHIT_BHANDARI_RESUME.pdf`);
 
-    rl.close();
-
-    // ─── Summary ─────────────────────────────────────────────────────────────
+    // ─── Full preview ─────────────────────────────────────────────────────────
 
     console.log("\n─────────────────────────────────────");
     console.log(`📤  To:      ${to}`);
     console.log(`📌  Subject: ${subject}`);
-    console.log(`📝  Body:    ${body.slice(0, 60)}${body.length > 60 ? "..." : ""}`);
-    console.log(`📎  Attachments: ${attachments.length} file(s)`);
-    console.log("─────────────────────────────────────\n");
+    console.log(`📎  Attachment: MOHIT_BHANDARI_RESUME.pdf`);
+    console.log("\n📝  Body:\n");
+    console.log(body);
+    console.log("\n─────────────────────────────────────");
+
+    const shouldSend = await confirm({ message: "Send?" });
+    if (!shouldSend) {
+        console.log("Aborted.");
+        process.exit(0);
+    }
 
     return { to, subject, body, attachments, company: companyName };
 }
