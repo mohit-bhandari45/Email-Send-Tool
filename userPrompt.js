@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import select from "@inquirer/select";
 import { ask, rl } from "./helper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -117,13 +118,20 @@ async function promptUser() {
     }
     saveCompanies(companies);
 
-    // Subject — read from subject.txt
+    // Subject — pick from subject.txt
     if (!fs.existsSync(SUBJECT_FILE)) {
         console.error("❌  subject.txt not found in project directory.");
         process.exit(1);
     }
-    const subject = fs.readFileSync(SUBJECT_FILE, "utf-8").trim();
-    console.log(`📌  Subject loaded: ${subject}`);
+    const subjects = fs.readFileSync(SUBJECT_FILE, "utf-8")
+        .split("\n")
+        .map(l => l.trim())
+        .filter(Boolean);
+    const subject = await select({
+        message: "Subject:",
+        choices: subjects.map(s => ({ name: s, value: s })),
+    });
+    console.log(`📌  Subject: ${subject}`);
 
     // Body — read from email.txt
     if (!fs.existsSync(EMAIL_BODY_FILE)) {
