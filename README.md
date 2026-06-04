@@ -38,7 +38,7 @@ You will be prompted for:
 4. **Subject** — pick from the list in `subject.txt` using arrow keys
 5. **Email template** — pick from files in the `emails/` folder using arrow keys
 
-A full preview of the composed email is shown before sending. Confirm with `y` to send or `n` to abort.
+A full preview of the composed email is shown before sending. An interactive `Y/n` prompt confirms before the email is sent.
 
 ### Name resolution
 
@@ -80,12 +80,7 @@ Records every successful send. Checked before each send to prevent duplicates:
 }
 ```
 
-If the email was sent before, you'll see:
-
-```
-⚠️  Already sent to john@acme.com on Wed Jun 04 2026 — Subject: "..."
-Send again? (y/n):
-```
+If the email was sent before, you'll see a warning with the previous send date and subject, followed by a `Y/n` confirmation prompt before proceeding.
 
 ## Gitignored files
 
