@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import select from "@inquirer/select";
 import { ask, rl } from "./helper.js";
+import { check as checkSent } from "./sentLog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -99,6 +100,17 @@ async function promptUser() {
         console.log(`  → Generic email detected — greeting set to "Team"`);
     }
 
+    const previousSend = checkSent(to);
+    if (previousSend) {
+        console.log(`\n  ⚠️   Already sent to ${to} on ${new Date(previousSend.sentAt).toDateString()} — Subject: "${previousSend.subject}"`);
+        const again = await ask("  Send again? (y/n): ");
+        if (again.toLowerCase() !== "y") {
+            console.log("  Aborted.");
+            rl.close();
+            process.exit(0);
+        }
+    }
+
     // Upsert into companies.json
     const companies = loadCompanies();
     if (companies[companyName]) {
@@ -160,7 +172,7 @@ async function promptUser() {
     console.log(`📎  Attachments: ${attachments.length} file(s)`);
     console.log("─────────────────────────────────────\n");
 
-    return { to, subject, body, attachments };
+    return { to, subject, body, attachments, company: companyName };
 }
 
 export default promptUser;

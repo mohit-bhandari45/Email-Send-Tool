@@ -1,6 +1,6 @@
 # Gmail CLI — Cold Email Tool
 
-A terminal tool for sending personalized cold emails via Gmail. Tracks companies and contacts in a local JSON file, auto-fills the recipient's name from their LinkedIn profile, and attaches your resume automatically.
+A terminal tool for sending personalized cold emails via Gmail. Tracks companies and contacts, auto-fills the recipient's name from their LinkedIn profile, prevents duplicate sends, and attaches your resume automatically.
 
 ## Setup
 
@@ -21,7 +21,7 @@ A terminal tool for sending personalized cold emails via Gmail. Tracks companies
    | File | Purpose |
    |------|---------|
    | `email.txt` | Email body. Use `{name}` where the recipient's name should appear. |
-   | `subject.txt` | Single line — used as the email subject. |
+   | `subject.txt` | One subject per line — shown as a selection list in the CLI. |
    | `YOUR_RESUME.pdf` | Attached automatically to every email. Update the filename in `userPrompt.js`. |
 
 ## Usage
@@ -32,21 +32,24 @@ node send.js
 
 You will be prompted for:
 
-1. **Company LinkedIn URL** — e.g. `https://linkedin.com/company/acme-corp`
-2. **Sender LinkedIn URL** — the person you're emailing; their name is extracted automatically
+1. **Company LinkedIn URL** — e.g. `https://linkedin.com/company/acme-corp` (name extracted from URL)
+2. **Sender LinkedIn URL** — recipient's name is fetched automatically
 3. **Sender Email** — used as the `To` field
+4. **Subject** — pick from the list in `subject.txt` using arrow keys
 
-Subject and body are loaded from `subject.txt` and `email.txt`. No other input needed.
+Body and attachment are loaded automatically. No other input needed.
 
 ### Name resolution
 
 - Tries to fetch the recipient's name from their LinkedIn public profile page.
-- Falls back to parsing the URL slug (`/in/john-doe` → `John Doe`).
-- If the email is a generic alias (`info@`, `hr@`, `careers@`, etc.), the greeting is set to `Team` instead of a name.
+- Falls back to parsing the URL slug (`/in/john-doe` → `John Doe`, strips trailing IDs).
+- If the email is a generic alias (`info@`, `hr@`, `careers@`, etc.), the greeting is set to `Team`.
 
-## Company tracking
+## Data files
 
-Each run upserts into `companies.json`:
+### `companies.json` — contact store
+
+Each run saves the company and owner details:
 
 ```json
 {
@@ -60,13 +63,35 @@ Each run upserts into `companies.json`:
 }
 ```
 
-Duplicate owners (matched by email) are skipped rather than duplicated.
+Duplicate owners (matched by email) are skipped.
+
+### `sent.json` — send history
+
+Records every successful send. Checked before each send to prevent duplicates:
+
+```json
+{
+  "john@acme.com": {
+    "company": "acme-corp",
+    "subject": "Full-Stack Developer – Exploring Opportunities",
+    "sentAt": "2026-06-04T10:32:00.000Z"
+  }
+}
+```
+
+If the email was sent before, you'll see:
+
+```
+⚠️  Already sent to john@acme.com on Wed Jun 04 2026 — Subject: "..."
+Send again? (y/n):
+```
 
 ## Gitignored files
 
 ```
 .env
 companies.json
+sent.json
 email.txt
 subject.txt
 *.pdf

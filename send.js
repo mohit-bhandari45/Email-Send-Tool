@@ -3,6 +3,7 @@
 import "dotenv/config";
 import promptUser from "./userPrompt.js";
 import sendEmail from "./sendEmail.js";
+import { record as recordSent } from "./sentLog.js";
 
 // ─── Credentials Check ────────────────────────────────────────────────────────
 
@@ -22,4 +23,5 @@ Get an App Password at: https://myaccount.google.com/apppasswords
 (async () => {
   const data = await promptUser();
   await sendEmail(data);
+  recordSent({ email: data.to, company: data.company, subject: data.subject });
 })();
