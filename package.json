@@ -1,0 +1,22 @@
+{
+  "name": "gmail-cli",
+  "version": "1.0.0",
+  "description": "Send emails from Gmail via terminal",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "inquirer": "^14.0.1",
+    "nodemailer": "^8.0.10"
+  },
+  "bin": {
+    "send": "./send.js"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+.env
+companies.json
+subject.txt
+email.txt
+*.pdf

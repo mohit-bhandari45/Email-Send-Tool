@@ -1,0 +1,158 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { ask, rl } from "./helper.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const EMAIL_BODY_FILE = path.join(__dirname, "email.txt");
+const SUBJECT_FILE = path.join(__dirname, "subject.txt");
+const RESUME_FILE = path.join(__dirname, "MOHIT_BHANDARI_RESUME.pdf");
+const COMPANIES_FILE = path.join(__dirname, "companies.json");
+
+async function fetchLinkedInName(url) {
+    try {
+        const res = await fetch(url, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "text/html",
+            },
+        });
+        const html = await res.text();
+
+        // og:title is usually "First Last - Title | LinkedIn"
+        const og = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/);
+        if (og) return og[1].split(" - ")[0].split(" | ")[0].trim();
+
+        const title = html.match(/<title[^>]*>([^<]+)<\/title>/);
+        if (title) return title[1].split(" - ")[0].split(" | ")[0].trim();
+    } catch {
+        // network or parse failure — fall through to slug
+    }
+    return null;
+}
+
+function slugToName(url) {
+    const match = url.match(/linkedin\.com\/in\/([^/?]+)/);
+    if (!match) return null;
+    return match[1]
+        .split("-")
+        .filter(p => !/\d/.test(p))
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+}
+
+function extractCompanyName(url) {
+    const match = url.match(/linkedin\.com\/company\/([^/?]+)/);
+    return match ? match[1] : null;
+}
+
+function loadCompanies() {
+    if (!fs.existsSync(COMPANIES_FILE)) return {};
+    return JSON.parse(fs.readFileSync(COMPANIES_FILE, "utf-8"));
+}
+
+function saveCompanies(data) {
+    fs.writeFileSync(COMPANIES_FILE, JSON.stringify(data, null, 2), "utf-8");
+}
+
+async function promptUser() {
+    console.log("\n📧  Gmail Terminal — Compose Email\n");
+    console.log(`From: ${process.env.GMAIL_USER}\n`);
+
+    // Company LinkedIn
+    let companyLinkedin = "";
+    let companyName = "";
+    while (!companyName) {
+        companyLinkedin = await ask("Company LinkedIn URL: ");
+        companyName = extractCompanyName(companyLinkedin);
+        if (!companyName) console.log("  ⚠️  Invalid LinkedIn company URL. Expected format: linkedin.com/company/<name>\n");
+    }
+    console.log(`  → Company: ${companyName}`);
+
+    // Owner LinkedIn + name extraction
+    let ownerLinkedin = "";
+    let recipientName = "";
+    while (!ownerLinkedin) {
+        ownerLinkedin = await ask("Sender LinkedIn URL: ");
+        if (!ownerLinkedin) { console.log("  ⚠️  Sender LinkedIn URL is required.\n"); continue; }
+        process.stdout.write("  → Fetching name from LinkedIn...");
+        recipientName = await fetchLinkedInName(ownerLinkedin) ?? slugToName(ownerLinkedin) ?? "there";
+        console.log(` ${recipientName}`);
+    }
+
+    // Owner email — used as the "To" field
+    const GENERIC_ALIASES = new Set([
+        "info", "contact", "hello", "team", "support", "hr", "careers", "jobs",
+        "admin", "help", "sales", "marketing", "office", "general", "hire",
+        "hiring", "recruit", "recruiting", "talent", "enquiries", "enquiry",
+    ]);
+    let to = "";
+    while (!to) {
+        to = await ask("Sender Email (To): ");
+        if (!to) console.log("  ⚠️  Sender email is required.\n");
+    }
+    const localPart = to.split("@")[0].toLowerCase();
+    if (GENERIC_ALIASES.has(localPart)) {
+        recipientName = "Team";
+        console.log(`  → Generic email detected — greeting set to "Team"`);
+    }
+
+    // Upsert into companies.json
+    const companies = loadCompanies();
+    if (companies[companyName]) {
+        const alreadyExists = companies[companyName].owners.some(o => o.email === to);
+        if (!alreadyExists) {
+            companies[companyName].owners.push({ linkedin: ownerLinkedin, email: to });
+            console.log(`\n  ✅  Added new owner to existing company "${companyName}"`);
+        } else {
+            console.log(`\n  ℹ️   Owner ${to} already recorded under "${companyName}"`);
+        }
+    } else {
+        companies[companyName] = {
+            companyLinkedin,
+            owners: [{ linkedin: ownerLinkedin, email: to }],
+        };
+        console.log(`\n  ✅  New company "${companyName}" saved`);
+    }
+    saveCompanies(companies);
+
+    // Subject — read from subject.txt
+    if (!fs.existsSync(SUBJECT_FILE)) {
+        console.error("❌  subject.txt not found in project directory.");
+        process.exit(1);
+    }
+    const subject = fs.readFileSync(SUBJECT_FILE, "utf-8").trim();
+    console.log(`📌  Subject loaded: ${subject}`);
+
+    // Body — read from email.txt
+    if (!fs.existsSync(EMAIL_BODY_FILE)) {
+        console.error("❌  email.txt not found in project directory.");
+        process.exit(1);
+    }
+    const body = fs.readFileSync(EMAIL_BODY_FILE, "utf-8").trim().replace("{name}", recipientName);
+    console.log(`\n📝  Body loaded from email.txt (${body.split("\n").length} lines)`);
+
+    // Attachments — always attach resume
+    if (!fs.existsSync(RESUME_FILE)) {
+        console.error("❌  MOHIT_BHANDARI_RESUME.pdf not found in project directory.");
+        process.exit(1);
+    }
+    const attachments = [{ path: RESUME_FILE }];
+    console.log(`📎  Attaching: MOHIT_BHANDARI_RESUME.pdf`);
+
+    rl.close();
+
+    // ─── Summary ─────────────────────────────────────────────────────────────
+
+    console.log("\n─────────────────────────────────────");
+    console.log(`📤  To:      ${to}`);
+    console.log(`📌  Subject: ${subject}`);
+    console.log(`📝  Body:    ${body.slice(0, 60)}${body.length > 60 ? "..." : ""}`);
+    console.log(`📎  Attachments: ${attachments.length} file(s)`);
+    console.log("─────────────────────────────────────\n");
+
+    return { to, subject, body, attachments };
+}
+
+export default promptUser;
