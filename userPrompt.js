@@ -78,8 +78,15 @@ async function promptUser() {
         ownerLinkedin = await input({ message: "Sender LinkedIn URL:" });
         if (!ownerLinkedin) { console.log("  ⚠️  Sender LinkedIn URL is required.\n"); continue; }
         process.stdout.write("  → Fetching name from LinkedIn...");
-        recipientName = await fetchLinkedInName(ownerLinkedin) ?? slugToName(ownerLinkedin) ?? "there";
-        console.log(` ${recipientName}`);
+        const detectedName = await fetchLinkedInName(ownerLinkedin) ?? slugToName(ownerLinkedin);
+        if (detectedName) {
+            console.log(` ${detectedName}`);
+            const nameOk = await confirm({ message: `  Use "${detectedName}" as recipient name?`, default: true });
+            recipientName = nameOk ? detectedName : await input({ message: "  Enter recipient name:" }) || "there";
+        } else {
+            console.log(" (could not extract)");
+            recipientName = await input({ message: "  Enter recipient name (leave blank for 'there'):" }) || "there";
+        }
     }
 
     // Owner email — used as the "To" field
