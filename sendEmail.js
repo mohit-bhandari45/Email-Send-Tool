@@ -10,7 +10,7 @@ async function sendEmail({ to, subject, body, attachments }) {
   });
 
   const mailOptions = {
-    from: `"Terminal Mail" <${process.env.GMAIL_USER}>`,
+    from: `"${process.env.SENDER_NAME}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     text: body,
