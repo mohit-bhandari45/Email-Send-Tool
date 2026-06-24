@@ -61,32 +61,50 @@ async function promptUser() {
     console.log("\n📧  Gmail Terminal — Compose Email\n");
     console.log(`From: ${process.env.GMAIL_USER}\n`);
 
-    // Company LinkedIn
+    // Choose email type: application or opportunity
+    const emailType = await select({
+        message: "Email type:",
+        choices: [
+            { name: "Application", value: "application" },
+            { name: "Opportunity", value: "opportunity" },
+        ],
+    });
+
     let companyLinkedin = "";
     let companyName = "";
-    while (!companyName) {
-        companyLinkedin = await input({ message: "Company LinkedIn URL:" });
-        companyName = extractCompanyName(companyLinkedin);
-        if (!companyName) console.log("  ⚠️  Invalid LinkedIn company URL. Expected format: linkedin.com/company/<name>\n");
-    }
-    console.log(`  → Company: ${companyName}`);
-
-    // Owner LinkedIn + name extraction
     let ownerLinkedin = "";
-    let recipientName = "";
-    while (!ownerLinkedin) {
-        ownerLinkedin = await input({ message: "Sender LinkedIn URL:" });
-        if (!ownerLinkedin) { console.log("  ⚠️  Sender LinkedIn URL is required.\n"); continue; }
-        process.stdout.write("  → Fetching name from LinkedIn...");
-        const detectedName = await fetchLinkedInName(ownerLinkedin) ?? slugToName(ownerLinkedin);
-        if (detectedName) {
-            console.log(` ${detectedName}`);
-            const nameOk = await confirm({ message: `  Use "${detectedName}" as recipient name?`, default: true });
-            recipientName = nameOk ? detectedName : await input({ message: "  Enter recipient name:" }) || "there";
-        } else {
-            console.log(" (could not extract)");
-            recipientName = await input({ message: "  Enter recipient name (leave blank for 'there'):" }) || "there";
+    let recipientName = "there"; // default greeting
+
+    if (emailType === "opportunity") {
+        // Company LinkedIn
+        while (!companyName) {
+            companyLinkedin = await input({ message: "Company LinkedIn URL:" });
+            companyName = extractCompanyName(companyLinkedin);
+            if (!companyName) console.log("  ⚠️  Invalid LinkedIn company URL. Expected format: linkedin.com/company/<name>\n");
         }
+        console.log(`  → Company: ${companyName}`);
+
+        // Owner LinkedIn + name extraction
+        while (!ownerLinkedin) {
+            ownerLinkedin = await input({ message: "Sender LinkedIn URL:" });
+            if (!ownerLinkedin) { console.log("  ⚠️  Sender LinkedIn URL is required.\n"); continue; }
+            process.stdout.write("  → Fetching name from LinkedIn...");
+            const detectedName = await fetchLinkedInName(ownerLinkedin) ?? slugToName(ownerLinkedin);
+            if (detectedName) {
+                console.log(` ${detectedName}`);
+                const nameOk = await confirm({ message: `  Use "${detectedName}" as recipient name?`, default: true });
+                recipientName = nameOk ? detectedName : await input({ message: "  Enter recipient name:" }) || "there";
+            } else {
+                console.log(" (could not extract)");
+                recipientName = await input({ message: "  Enter recipient name (leave blank for 'there'):" }) || "there";
+            }
+        }
+    } else {
+        // application: don't ask LinkedIn URLs or names
+        console.log("  → Application flow: skipping LinkedIn prompts and company save");
+        companyName = null;
+        companyLinkedin = null;
+        ownerLinkedin = null;
     }
 
     // Owner email — used as the "To" field
@@ -115,32 +133,43 @@ async function promptUser() {
             process.exit(0);
         }
     }
-
-    // Upsert into companies.json
-    const companies = loadCompanies();
-    if (companies[companyName]) {
-        const alreadyExists = companies[companyName].owners.some(o => o.email === to);
-        if (!alreadyExists) {
-            companies[companyName].owners.push({ linkedin: ownerLinkedin, email: to });
-            console.log(`\n  ✅  Added new owner to existing company "${companyName}"`);
+    // Upsert into companies.json (only for opportunity emails)
+    if (emailType === "opportunity") {
+        const companies = loadCompanies();
+        if (companies[companyName]) {
+            const alreadyExists = companies[companyName].owners.some(o => o.email === to);
+            if (!alreadyExists) {
+                companies[companyName].owners.push({ linkedin: ownerLinkedin, email: to });
+                console.log(`\n  ✅  Added new owner to existing company "${companyName}"`);
+            } else {
+                console.log(`\n  ℹ️   Owner ${to} already recorded under "${companyName}"`);
+            }
         } else {
-            console.log(`\n  ℹ️   Owner ${to} already recorded under "${companyName}"`);
+            companies[companyName] = {
+                companyLinkedin,
+                owners: [{ linkedin: ownerLinkedin, email: to }],
+            };
+            console.log(`\n  ✅  New company "${companyName}" saved`);
         }
-    } else {
-        companies[companyName] = {
-            companyLinkedin,
-            owners: [{ linkedin: ownerLinkedin, email: to }],
-        };
-        console.log(`\n  ✅  New company "${companyName}" saved`);
+        saveCompanies(companies);
     }
-    saveCompanies(companies);
 
-    // Subject — pick from subject.txt
-    if (!fs.existsSync(SUBJECT_FILE)) {
-        console.error("❌  subject.txt not found in project directory.");
+    // Subject & Body — use subfolders depending on email type
+    let subjectFilePath;
+    let templatesDir;
+    if (emailType === "application") {
+        subjectFilePath = path.join(__dirname, "subjects", "applicationSubjects", "subject.txt");
+        templatesDir = path.join(__dirname, "emails", "applicationEmails");
+    } else {
+        subjectFilePath = path.join(__dirname, "subjects", "opporSubjects", "subject.txt");
+        templatesDir = path.join(__dirname, "emails", "opporEmails");
+    }
+
+    if (!fs.existsSync(subjectFilePath)) {
+        console.error(`❌  Subject file not found: ${subjectFilePath}`);
         process.exit(1);
     }
-    const subjects = fs.readFileSync(SUBJECT_FILE, "utf-8")
+    const subjects = fs.readFileSync(subjectFilePath, "utf-8")
         .split("\n")
         .map(l => l.trim())
         .filter(Boolean);
@@ -150,28 +179,28 @@ async function promptUser() {
     });
     console.log(`📌  Subject: ${subject}`);
 
-    // Body — pick template from emails/
-    if (!fs.existsSync(EMAILS_DIR)) {
-        console.error("❌  emails/ folder not found in project directory.");
+    // Body — pick template from the chosen templatesDir
+    if (!fs.existsSync(templatesDir)) {
+        console.error(`❌  templates folder not found: ${templatesDir}`);
         process.exit(1);
     }
-    const templates = fs.readdirSync(EMAILS_DIR).filter(f => f.endsWith(".txt"));
+    const templates = fs.readdirSync(templatesDir).filter(f => f.endsWith(".txt"));
     if (!templates.length) {
-        console.error("❌  No .txt templates found in emails/ folder.");
+        console.error("❌  No .txt templates found in templates folder.");
         process.exit(1);
     }
     const chosenTemplate = await select({
         message: "Email template:",
         choices: templates.map(f => ({ name: path.basename(f, ".txt"), value: f })),
     });
-    const body = fs.readFileSync(path.join(EMAILS_DIR, chosenTemplate), "utf-8").trim().replace("{name}", recipientName);
+    const body = fs.readFileSync(path.join(templatesDir, chosenTemplate), "utf-8").trim().replace("{name}", recipientName);
 
-    // Attachments — always attach resume
+    // Attachments — always attach resume (set filename to avoid exposing full path)
     if (!fs.existsSync(RESUME_FILE)) {
         console.error("❌  MOHIT_BHANDARI_RESUME.pdf not found in project directory.");
         process.exit(1);
     }
-    const attachments = [{ path: RESUME_FILE }];
+    const attachments = [{ filename: path.basename(RESUME_FILE), path: RESUME_FILE }];
 
     // ─── Full preview ─────────────────────────────────────────────────────────
 
