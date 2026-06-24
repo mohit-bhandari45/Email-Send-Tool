@@ -21,23 +21,38 @@ function saveFile(filePath, data) {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
-function check(email) {
-    const app = loadFile(APP_FILE);
-    if (app[email]) return { ...app[email], type: "application" };
-    const opp = loadFile(OPP_FILE);
-    if (opp[email]) return { ...opp[email], type: "opportunity" };
+function check(email, type) {
+    // Require an explicit type to avoid cross-log fallbacks.
+    if (!type) return null;
+
+    if (type === "application") {
+        const app = loadFile(APP_FILE);
+        if (app[email]) return { ...app[email], type: "application" };
+        return null;
+    }
+
+    if (type === "opportunity") {
+        const opp = loadFile(OPP_FILE);
+        if (opp[email]) return { ...opp[email], type: "opportunity" };
+        return null;
+    }
+
     return null;
 }
 
 function record({ email, company = null, subject, type = "opportunity", recipientName = null }) {
     const sentAt = new Date().toISOString();
+    const d = new Date(sentAt);
+    const month = d.toLocaleString("en-GB", { month: "long" }).toLowerCase();
+    const sentDate = `${d.getDate()} ${month}, ${d.getFullYear()}`; // e.g. "14 march, 2026"
+
     if (type === "application") {
         const app = loadFile(APP_FILE);
-        app[email] = { subject, recipientName, sentAt };
+        app[email] = { subject, recipientName, sentAt, sentDate };
         saveFile(APP_FILE, app);
     } else {
         const opp = loadFile(OPP_FILE);
-        opp[email] = { company, subject, recipientName, sentAt };
+        opp[email] = { company, subject, recipientName, sentAt, sentDate };
         saveFile(OPP_FILE, opp);
     }
 }

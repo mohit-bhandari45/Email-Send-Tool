@@ -124,7 +124,7 @@ async function promptUser() {
         console.log(`  → Generic email detected — greeting set to "Team"`);
     }
 
-    const previousSend = checkSent(to);
+    const previousSend = checkSent(to, emailType);
     if (previousSend) {
         console.log(`\n  ⚠️   Already sent to ${to} on ${new Date(previousSend.sentAt).toDateString()} — Subject: "${previousSend.subject}"`);
         const again = await confirm({ message: "Send again?" });
