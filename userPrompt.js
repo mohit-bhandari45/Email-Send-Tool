@@ -218,7 +218,7 @@ async function promptUser() {
         process.exit(0);
     }
 
-    return { to, subject, body, attachments, company: companyName };
+    return { to, subject, body, attachments, company: companyName, type: emailType, recipientName };
 }
 
 export default promptUser;

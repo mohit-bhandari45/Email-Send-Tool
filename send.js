@@ -23,5 +23,6 @@ Get an App Password at: https://myaccount.google.com/apppasswords
 (async () => {
   const data = await promptUser();
   await sendEmail(data);
-  recordSent({ email: data.to, company: data.company, subject: data.subject });
+  // recordSent will route to the proper log file based on `type`
+  recordSent({ email: data.to, company: data.company, subject: data.subject, type: data.type, recipientName: data.recipientName });
 })();
