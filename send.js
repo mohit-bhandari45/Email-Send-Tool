@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import "dotenv/config";
-import promptUser from "./userPrompt.js";
+import promptUser from "./userPrompt/index.js";
 import sendEmail from "./sendEmail.js";
 import { record as recordSent } from "./sentLog.js";
 
@@ -24,5 +24,5 @@ Get an App Password at: https://myaccount.google.com/apppasswords
   const data = await promptUser();
   await sendEmail(data);
   // recordSent will route to the proper log file based on `type`
-  recordSent({ email: data.to, company: data.company, subject: data.subject, type: data.type, recipientName: data.recipientName });
+  recordSent({ email: data.to, company: data.company, subject: data.subject, type: data.type, recipientName: data.recipientName, role: data.role, followUpDate: data.followUpDate, notes: data.notes });
 })();

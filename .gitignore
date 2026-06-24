@@ -5,3 +5,4 @@ sent.json
 subject.txt
 emails/
 *.pdf
+logs/

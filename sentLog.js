@@ -40,7 +40,7 @@ function check(email, type) {
     return null;
 }
 
-function record({ email, company = null, subject, type = "opportunity", recipientName = null }) {
+function record({ email, company = null, subject, type = "opportunity", recipientName = null, role = null, followUpDate = null, notes = null }) {
     const sentAt = new Date().toISOString();
     const d = new Date(sentAt);
     const month = d.toLocaleString("en-GB", { month: "long" }).toLowerCase();
@@ -48,7 +48,7 @@ function record({ email, company = null, subject, type = "opportunity", recipien
 
     if (type === "application") {
         const app = loadFile(APP_FILE);
-        app[email] = { subject, recipientName, sentAt, sentDate };
+        app[email] = { subject, role, company, recipientName, sentAt, sentDate, followUpDate, notes };
         saveFile(APP_FILE, app);
     } else {
         const opp = loadFile(OPP_FILE);
